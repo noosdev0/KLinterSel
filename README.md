@@ -1,7 +1,5 @@
 # KLinterSel <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="100">
 
-```![Think in azul](images/thinkazul.svg)
-
 KLinterSel is a Python project for calculating intersections between selective sites detected by different methods. The main script performs operations on genomic data from selective scans and supports statistical tests and plotting.
 
 ## Requirements
