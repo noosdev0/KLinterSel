@@ -19,7 +19,7 @@ KLinterSel is a Python project for calculating intersections between selective s
 
 To run the script, use the following command:
 
-   ```bash
+```bash
    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...]
 ```
 For just intersections at a specified distance:
