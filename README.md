@@ -1,4 +1,4 @@
-# KLinterSel &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="50">
+# KLinterSel <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="100">
 
 ```![Think in azul](images/thinkazul.svg)
 
