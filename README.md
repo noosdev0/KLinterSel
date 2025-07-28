@@ -1,11 +1,13 @@
-# KLinterSel
+# KLinterSel &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="50">
+
+```![Think in azul](images/thinkazul.svg)
 
 KLinterSel is a Python project for calculating intersections between selective sites detected by different methods. The main script performs operations on genomic data from selective scans and supports statistical tests and plotting.
 
 ## Requirements
 
 - Python 3.7+
-- Libraries: numpy, pandas, seaborn, scipy, csv
+- Libraries: numpy, pandas, matplotlib, seaborn, scipy
 
 ## Installation
 
