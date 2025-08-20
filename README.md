@@ -18,8 +18,11 @@ You can get KLinterSel by downloading the prebuilt binaries from the [Releases s
 
 2. Create and activate a virtual environment (recommended).
 
-python -m venv venv
-source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+```bash
+   python -m venv venv
+   source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+```
+
 
 3. Install the required libraries using `pip install -r requirements.txt`
 
