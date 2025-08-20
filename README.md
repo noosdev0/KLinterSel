@@ -9,8 +9,17 @@ KLinterSel is a Python project for calculating intersections between selective s
 
 ## Installation
 
-1. Clone this repository or download the files.
-2. Create and activate a virtual environment
+You can get KLinterSel by downloading the prebuilt binaries from the [Releases section](https://github.com/noosdev0/KLinterSel/releases) or by installing the program from source:
+
+1. Clone this repository or download the source files by clicking on the green "Code" button and selecting "Download ZIP."
+   ```bash
+   git clone https://github.com/noosdev0/KLinterSel.git
+
+
+2. Create and activate a virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate  # On Windows use `venv\Scripts\activate`
+
 3. Install the required libraries using `pip install -r requirements.txt`
 
 ## Usage
