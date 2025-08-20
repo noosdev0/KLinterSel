@@ -5,7 +5,7 @@ KLinterSel is a Python project for calculating intersections between selective s
 ## Requirements
 
 - Python 3.7+
-- Libraries: numpy, pandas, matplotlib, seaborn, scipy
+- Libraries: numpy, pandas, matplotlib, seaborn, scipy, psutil
 
 ## Installation
 
