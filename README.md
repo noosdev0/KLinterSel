@@ -59,7 +59,8 @@ From the project folder:
 3. **Install dependencies inside the venv**
 
     python -m pip install -U pip setuptools wheel packaging
-     # if your Python is 3.8, install numpy first:
+    
+    \# if your Python is 3.8, install numpy first:
     python -m pip install "numpy<1.25"
     python -m pip install -r requirements.txt
    
