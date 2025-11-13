@@ -2,12 +2,20 @@
 
 KLinterSel is a Python project for calculating intersections between selective sites detected by different methods. The main script performs operations on genomic data from selective scans and supports statistical tests and plotting.
 
+
+## Quick start
+
+You can get **KLinterSel** by downloading the prebuilt binaries from the [Releases section](https://github.com/noosdev0/KLinterSel/releases). The executables should run without any additional requirements on their corresponding operating system.
+
+If you prefer not to use the executables, or cannot run them, you can alternatively run KLinterSel from Python by installing the dependencies listed below.
+
+
 ## Requirements
 
 - Python 3.7+ (recommended >= 3.10)
 - Libraries: numpy, pandas, matplotlib, seaborn, scipy, psutil
 
-## Quick start
+
 ### Option A - You already have Python 3.7+
 
 From the project folder:
