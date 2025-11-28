@@ -1,3 +1,16 @@
+# Update v0.2 (Nov 2025)
+
+This new version of **KLinterSel (v0.2)** introduces several improvements and bug fixes:
+
+- **Major speed-up of the KL computation** thanks to a more efficient `RelEntr` implementation.
+- **New command-line options**:
+  - `--permissive` to disable the strict redundancy filter between candidate files.
+  - `--uniform` to perform resampling from a uniform SNP distribution.
+- **Sorted intersection output**: elements within each intersection are now returned in sorted order for consistent and cleaner reporting.
+- **Bug fix**: corrected an issue in the resampling test where the comparison of medians introduced a slight conservative bias.
+  
+These changes improve reproducibility, performance, and interpretability while maintaining full compatibility with previous workflows.
+
 # KLinterSel <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="100">
 
 KLinterSel is a Python project for calculating intersections between selective sites detected by different methods. The main script performs operations on genomic data from selective scans and supports statistical tests and plotting.
