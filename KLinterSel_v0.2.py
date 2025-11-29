@@ -38,7 +38,8 @@ handler = logging.FileHandler(
 )
 
 formatter = logging.Formatter(
-    '%(asctime)s:%(levelname)s:%(message)s'
+    '%(asctime)s.%(msecs)03d %(levelname)s %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
 )
 handler.setFormatter(formatter)
 
@@ -126,7 +127,7 @@ KILOBASES=False
 FIGURE=False
 STATS=False
 # thresholds for strict control of files with very similar candidates if the ratio min(n_i,n_j)/max(n_i,n_j)>=UMBRAL1 and
-# UMBRAL2% of snps in file with min(n_i,n_j) snps are included in file with max(n_i,n_j) then exclude the file with the lowest number of snps
+# UMBRAL2 % of snps in file with min(n_i,n_j) snps are included in file with max(n_i,n_j) then exclude the file with the lowest number of snps
 UMBRAL1=0.75
 UMBRAL2=0.95
 
@@ -1483,6 +1484,7 @@ def filtrar_datos(datos_filtrados, umbral=0.75):
 
 
 '''
+v0.2 Nov 2025
 Aplicamos las reglas por cromosoma lo que es un poco  más exigente y preciso.
 En el caso global sería posible que en un cromosoma coincidan 99% pero en otro solo el 50% y según sea el umbral por ejemplo 75% podrían considerarse que cumple
 cuando algún cromosoma no cumple ni de lejos. 
@@ -1621,6 +1623,27 @@ def filtrar_datos_B(datos_filtrados, umbral1=0.75, umbral2=1.0, min_snps=5):
 
     return nueva_lista, eliminados
 
+# v0.2 Nov 2025
+def format_arrP(x, dec_fijo=6, dec_sci=6):
+    x = float(x)
+
+    if x == 0.0:
+        # Cero exacto → formato fijo
+        return f"{x:.{dec_fijo}f}"
+
+    if abs(x) >= 1e-6:
+        # Notación normal
+        return f"{x:.{dec_fijo}f}"
+    else:
+        # Notación científica
+        return f"{x:.{dec_sci}e}"
+
+def format_pvalue(p, nperm=10000):
+    # número de decimales necesarios
+    # ejemplo: 10000 → 4 decimales, 100000 → 5 decimales
+    dec = len(str(nperm)) - 1
+    return f"{p:.{dec}f}"
+
 
 def main():
 
@@ -1675,7 +1698,7 @@ def main():
     parser.add_argument('--permissive', action='store_false', dest='strict',
                     help='avoid strict rule for redundancy')
 
-
+    # Intersecciones solo para el cromosoma indicado
     parser.add_argument('--chr-id',
                         type=positive_int,  # Usar la función de validación
                         default=None,      # Valor por defecto es None
@@ -1725,7 +1748,15 @@ def main():
         TEST=False
 
     if args.paint:
-        FIGURE=True
+        
+        if not TEST:
+            mensaje="If you specify both --notest and --paint, no plots will be generated. The --paint option requires the expected distribution computed during the test, which is skipped when --notest is used."
+            logging.warning(mensaje)
+            print(f"\nWarning: {mensaje}")
+            print(f"Please refer to the {Path(handler.baseFilename).name} file for more details.")
+            #sys.exit(0)
+        else:
+            FIGURE=True
 
     if args.stats==True:
         STATS=True
@@ -1852,8 +1883,8 @@ def main():
                     nombre_superset = nombre[superset_idx]
                     for subset_idx in subset_list:
                         nombre_subset = nombre[subset_idx]
-                        msg=f"\n************************\nWARNING: File {nombre_subset} eliminated because at least {UMBRAL2:.0%} of its candidates are included in file {nombre_superset}.\n************************\n"
-                        print(msg)
+                        msg=f"File {nombre_subset} eliminated because at least {UMBRAL2:.0%} of its candidates are included in file {nombre_superset}.\n************************\n"
+                        print('\n'+msg)
                         logging.warning(msg)
                 #Actualiza la lista de nombres y de max snps per file
                 indices_finales = set().union(*eliminados.values())
@@ -2003,8 +2034,8 @@ def main():
                         #logging.error(mensaje_error_completo)  # Mensaje personalizado de error en el log
                         #print(mensaje_error_completo)
                         logging.error(mensaje)
-                        print(f"Error: {e}")
-                        print("Please refer to the 'memory.log' file for more details.")
+                        print(f"\nError: {e}")
+                        print(f"Please refer to the {Path(handler.baseFilename).name} file for more details.")
                         sys.exit(1)
 
                 avertot_distances=np.zeros(maxsites) # Inicializar
@@ -2149,7 +2180,7 @@ def main():
             print(f'{c+1}\t{Lsitios[0][c]}\t',end='')
             for i in range(1,numfiles):
                 print(f'{Lsitios[i][c]}\t',end='')
-            print(f'{np.format_float_positional(arrKL[c], precision=4)}\t{arrP[c]}\t{omedian[c]}\t{emedian[c]}\n')
+            print(f'{np.format_float_positional(arrKL[c], precision=4)}\t{format_pvalue(arrP[c], nperm=numrs)}\t{omedian[c]}\t{emedian[c]}\n')
 
             if FIGURE and (args.paint=='all' or args.paint==str(c+1)): # tot_distances[c],avertot_distances
                 fixed_max_xvalue = None
@@ -2374,7 +2405,7 @@ def main():
                 f.write(f'{c+1}{delimiter}{Lsitios[0][c]}{delimiter}')
                 for i in range(1,numfiles):
                     f.write(f'{Lsitios[i][c]}{delimiter}')
-                f.write(f'{np.format_float_positional(arrKL[c], precision=4)}{delimiter}{arrP[c]}{delimiter}{omedian[c]}{delimiter}{emedian[c]}\n')
+                f.write(f'{np.format_float_positional(arrKL[c], precision=4)}{delimiter}{format_pvalue(arrP[c], nperm=numrs)}{delimiter}{omedian[c]}{delimiter}{emedian[c]}\n')
 
     # Name for the interseccion file
     if not RANDOM:
