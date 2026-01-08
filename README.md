@@ -1,0 +1,179 @@
+# Update v0.3 (Dec 2025)  
+This release introduces a **new statistical test for k-way SNP coincidence based on a sequentially conditioned hypergeometric model (HGkI)**, extending KLinterSel beyond distance-based analyses.
+
+### New in v0.3
+
+- **Hypergeometric k-way intersection test (HGkI)**  
+  A new parametric test (--HG flag) to assess whether the observed overlap of candidates across multiple methods exceeds random expectation.
+      - Supports **exact SNP-level coincidence** (`--W 1`) and **window-based overlap** (`--W > 1`).
+      - The null model is **sequentially conditioned** on the observed number of candidates per method and chromosome.
+      - Implemented both at the SNP and regional (window) level.
+      - Robust handling of missing or non-overlapping candidates, with explicit warnings.
+
+- **Chromosome-level HG testing**  
+  The HGkI test can be applied chromosome by chromosome, allowing fine-grained detection of non-random overlap patterns.
+
+- **Improved statistical robustness**  
+      - Correction of resampling p-values using a **Davison–Hinkley adjustment**.
+      - Clear separation between distance-based KL tests and HG-based coincidence tests via the `--HG` flag.
+
+These additions make KLinterSel suitable for both **spatial clustering analyses** and **explicit tests of multi-method coincidence under a formal null model**.
+
+---
+
+# Update v0.2 (Nov 2025)
+
+This version introduced several improvements and bug fixes:
+
+- **Major speed-up of the KL computation** thanks to a more efficient `RelEntr` implementation.
+- **New command-line options**:
+      - `--permissive` to disable the strict redundancy filter between candidate files.
+      - `--uniform` to perform resampling from a uniform SNP distribution.
+- **Sorted intersection output**: elements within each intersection are now returned in sorted order for consistent and cleaner reporting.
+- **Bug fix**: corrected an issue in the resampling test where the comparison of medians introduced a slight conservative bias.
+  
+These changes improve reproducibility, performance, and interpretability while maintaining full compatibility with previous workflows.
+
+---
+
+# KLinterSel <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="100">
+
+KLinterSel is a Python project for calculating intersections between selective sites detected by different methods. The main script performs operations on genomic data from selective scans and supports statistical tests and plotting.
+
+
+## Quick start
+
+You can get **KLinterSel** by downloading the prebuilt binaries from the [Releases section](https://github.com/noosdev0/KLinterSel/releases). The executables should run without any additional requirements on their corresponding operating system.
+
+If you prefer not to use the executables, or cannot run them, you can alternatively run KLinterSel from Python by installing the dependencies listed below.
+
+
+## Requirements
+
+- Python 3.7+ (recommended >= 3.10)
+- Libraries: numpy, pandas, matplotlib, seaborn, scipy, psutil
+
+
+## Option A - You already have Python 3.7+
+
+From the project folder:
+
+```bash  
+    python -m pip install -U pip setuptools wheel packaging # optional but recommended
+    # If your Python is 3.8, install numpy first to avoid build issues:
+    python -m pip install "numpy<1.25"  # safe on 3.8
+    # Then the rest:
+    python -m pip install -r requirements.txt
+```
+
+## Option B - You **don't** have Python >= 3.7 (install & use a virtual environment)
+
+1. **Install Python (recommended >= 3.10)**
+
+    - **Ubuntu/Debian:** Prefer your distro's Python 3.x packages. If you need a newer Python, you can use a backport repo (e.g., deadsnakes) per your IT policy.
+    
+        sudo apt update
+    
+        sudo apt install -y python3.10 python3.10-venv
+    
+
+    - **macOS (Homebrew):**
+    
+        brew install python@3.11
+
+    - **Windows:**
+   Download and install from [python.org](https://www.python.org/downloads/)  
+   *(check the "Add python.exe to PATH" box during setup).*
+
+2. **Create and activate a virtual environment (recommended)**
+  
+    If you use Anaconda, deactivate it before creating a venv:
+     
+        conda deactivate
+
+        # Use the exact interpreter you installed (examples below):
+        
+        # Linux/macOS
+        python3 -m venv venv310  # or: /usr/bin/python3.11 -m venv venv310
+        source venv310/bin/activate
+
+        # Windows (PowerShell)
+        py -3.11 -m venv venv310
+        .\venv310\Scripts\Activate.ps1
+  
+
+3. **Install dependencies inside the venv**
+```bash  
+    python -m pip install -U pip setuptools wheel packaging
+    
+    # if your Python is 3.8, install numpy first:
+    python -m pip install "numpy<1.25"
+    python -m pip install -r requirements.txt
+```
+   
+🧠 Note: You can name your environment folder .venv, venv3.10, or any name you prefer.
+
+## Installation (from source)
+```bash  
+    git clone https://github.com/noosdev0/KLinterSel.git
+    cd KLinterSel
+    # (Pick Option A or B above to install dependencies)
+```
+
+## Usage
+
+Run the main script that executes the TKL test:
+```bash  
+    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...]
+```
+To perform the HGkI test for SNP coincidence
+```bash  
+    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --HG
+```
+The same HGkI test for overlapping windows of 1 kb
+```bash  
+    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --HG --w 1000
+```
+Only intersections at a specified distance:
+```bash  
+    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --dist <distance> --notest
+```
+
+Plot distributions:
+```bash  
+    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --paint
+```
+  
+## Features
+
+- Filter clusters in genomic data from selective scans
+- Calculate intersections between different methods
+- Perform statistical tests
+- Plot distributions
+
+## Troubleshooting
+  - **pandas complains about missing numpy during install**
+  
+    Install numpy first, then the rest:
+
+        python -m pip install "numpy<1.25"   # useful if Python 3.8 is installed
+        python -m pip install -r requirements.txt
+
+  - **pip attempts to compile and fails**
+  
+    Make sure build tools and pip are up to date:
+
+        python -m pip install -U pip setuptools wheel packaging
+    On Linux, if you really need to compile:
+        sudo apt install -y build-essential python3-dev
+
+  
+  - **The script is running with the wrong Python**
+  
+    Enable venv and use Python (without the 3). Verify with:
+
+        python -V
+        which python   # (Linux/macOS)
+        where python   # (Windows)
+
+  
