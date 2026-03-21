@@ -150,6 +150,7 @@ Plot distributions:
 - Calculate intersections between different methods
 - Perform statistical tests
 - Plot distributions
+- Note: Plot windows require a graphical session (GUI). See Troubleshooting if plots do not appear.
 
 ## Troubleshooting
   - **pandas complains about missing numpy during install**
@@ -175,5 +176,18 @@ Plot distributions:
         python -V
         which python   # (Linux/macOS)
         where python   # (Windows)
-
   
+- **Plots do not appear (when running from source)**
+  
+    KLinterSel uses Matplotlib for plotting. If `--paint` runs but no window appears, it is usually due to a missing GUI backend (common on minimal Linux installs or headless sessions).
+    
+    **Linux (Ubuntu/Debian):**
+        sudo apt install -y python3-tk
+    Then try again.
+    
+    **Headless environments (no GUI / remote server):**
+    Plot windows cannot be shown. Run without `--paint`, or use a desktop session.
+    
+    **Windows executables:**
+    The prebuilt `.exe` should display plots normally. If not, please report your Windows version and whether you are running from a remote session.
+    
