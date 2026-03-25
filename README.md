@@ -1,4 +1,4 @@
-# Update v0.3 (Dec 2025)  
+# Update v0.3 (Jan 2026)  
 This release introduces a **new statistical test for k-way SNP coincidence based on a sequentially conditioned hypergeometric model (HGkI)**, extending KLinterSel beyond distance-based analyses.
 
 ### New in v0.3
