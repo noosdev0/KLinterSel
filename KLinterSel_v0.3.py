@@ -1,7 +1,7 @@
 '''
 Author: ACR
 Program Name: KLinterSel
-Last Update Dec 2025: v0.3
+Last Update April 2026: v0.3
 
 '''
 
@@ -18,6 +18,18 @@ from collections import defaultdict
 from itertools import combinations
 from datetime import datetime
 import csv
+import matplotlib
+# Si estamos en un .exe de PyInstaller, forzamos un backend interactivo
+#if getattr(sys, "frozen", False):
+#v0.3 Windows option for pyinstaller .exe to be able of showing figures under windows
+if getattr(sys, "frozen", False) and sys.platform.startswith("win"):
+    matplotlib.use("TkAgg")  # requiere Tkinter disponible
+import matplotlib
+# Si estamos en un .exe de PyInstaller, forzamos un backend interactivo
+#if getattr(sys, "frozen", False):
+#v0.3 Windows option for pyinstaller .exe to be able of showing figures under windows
+if getattr(sys, "frozen", False) and sys.platform.startswith("win"):
+    matplotlib.use("TkAgg")  # requiere Tkinter disponible
 import matplotlib.pyplot as plt
 import seaborn as sns
 import numpy as np
@@ -3771,6 +3783,38 @@ def fp_summary_logger_tkl(fp_logger, title, res_fp, SCENARIOS, *, decision, top_
 v0.3: End of functions for false positive testing on TKL
 '''
 
+'''
+28 abril 2026. Añade función para normalizar las listas de cromosomas en ficheros candidatos.
+Actualmente si hay 19 cromosomas y falta el 12, se gestiona bien pero si hay 19 cromosomas
+y falta, entre otros, el 19, no se gestiona bien.
+
+'''
+def normalize_chromosome_lists(datos_filtrados, nombre=None):
+    """
+    Fuerza que todos los ficheros tengan el mismo número de cromosomas
+    que el fichero genómico original datos_filtrados[0].
+
+    Los cromosomas finales ausentes en candidatos se rellenan con arrays vacíos.
+    Si un candidato contiene cromosomas fuera del rango del genoma original, lanza error.
+    """
+    numcroms = len(datos_filtrados[0])
+
+    for i in range(1, len(datos_filtrados)):
+        n = len(datos_filtrados[i])
+
+        if n < numcroms:
+            datos_filtrados[i].extend(
+                [np.array([], dtype=np.int64) for _ in range(numcroms - n)]
+            )
+
+        elif n > numcroms:
+            fname = nombre[i] if nombre is not None else f"method {i}"
+            raise ValueError(
+                f"{fname} contains {n} chromosome entries, but the original "
+                f"genome file contains only {numcroms}. Please check chromosome IDs."
+            )
+
+    return datos_filtrados
 
 
 
@@ -3945,6 +3989,27 @@ def main():
     # Parsear los argumentos
     args = parser.parse_args()
 
+
+    # 02 May 2026 Controlar inconsistencia entre chrom-id y paint chrom
+    args = parser.parse_args()
+
+    paint_chr = None
+    if args.paint not in (False, None, 'all'):
+        paint_chr = int(args.paint)
+
+    # Validación
+    if args.chr_id is not None and paint_chr is not None:
+        if args.chr_id != paint_chr:
+            parser.error(
+                f"Inconsistent arguments: --chr-id ({args.chr_id}) and --paint ({paint_chr}) refer to different chromosomes."
+            )
+
+    if args.chr_id is not None and args.paint == 'all':
+        parser.error(
+            "--paint all is not compatible with --chr-id. Use --paint <chr> instead."
+        )
+
+
     #v0.3
     intersec = not args.skip_intersection
     R_MAX = 1000
@@ -4105,6 +4170,8 @@ def main():
         print(f'\nDATA OBTAINED FROM FILE {nombre[-1]}\n')
          
     numfiles= len(nombre)
+    # 28 abril 2026 Normalizar cromosomas ausentes en ficheros candidatos
+    datos_filtrados = normalize_chromosome_lists(datos_filtrados, nombre=nombre)
 
     samefiles=True
     for i in range(1,numfiles-1):
@@ -4719,8 +4786,12 @@ def main():
                 for i in range(1,numfiles):
                     print(f'SEL-{i}\t',end='')
                 print(f'KL\tPr\toQ2\teQ2\n')
+
+                #02 May 2026
+                chrom_indices = range(numcroms) if args.chr_id is None else [args.chr_id - 1]
                 
-                for c in range(numcroms):
+                #for c in range(numcroms):
+                for c in chrom_indices:
                     
                     # v0.2 Nov 2025 Ordena antes (aunque posiblemente ya está ordenado) y calcula el rango para cada cromosoma
                     datos_filtrados[0][c].sort() # el coste de ordenación es mínimo O(nlogn) no llega a 1 segundo en total en listas de 50000 snps y 20-30 cromosomas
@@ -4951,8 +5022,20 @@ def main():
 
                         # Crear el gráfico de distribución con frecuencias
                         p = sns.displot(data=df, x='value', col='array', kind='hist',
-                                        height=5, aspect=2, stat='probability',
+                                        height=5, aspect=1.6, stat='probability',
                                         bins=nbins)  # Ajustar el número de bins según sea necesario
+
+
+                        #02 May 2026 forzar mismo tamaño de gráficos
+                        p.fig.set_size_inches(12, 5)
+                        p.fig.subplots_adjust(
+                            left=0.08,
+                            right=0.98,
+                            bottom=0.15,
+                            top=0.90,
+                            wspace=0.15
+                        )
+
 
                         # Calcular los límites del eje Y para que sean iguales en ambos subplots
                         ylims = [ax.get_ylim() for ax in p.axes.flat]
@@ -5083,7 +5166,7 @@ def main():
     mkdir(dirsalida)
 
     #Para posterior construcción del nombre de los ficheros de resultados
-    formatted_distance = f"{distance:.0E}".replace('+', '').replace('E0', 'E') # to print x with 3 decimals: f'x:.3E'
+    formatted_distance = f"{distance:.1E}".replace('+', '').replace('E0', 'E') # to print x with 3 decimals: f'x:.3E'
     
     #Moment
     moment = datetime.now()
