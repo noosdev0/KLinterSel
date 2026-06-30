@@ -1,7 +1,7 @@
 '''
 Author: ACR
 Program Name: KLinterSel
-Last Update April 2026: v0.3
+Last Update June 2026: v0.3
 
 '''
 
@@ -165,8 +165,9 @@ FIGURE=False
 STATS=False
 # thresholds for strict control of files with very similar candidates if the ratio min(n_i,n_j)/max(n_i,n_j)>=UMBRAL1 and
 # UMBRAL2 % of snps in file with min(n_i,n_j) snps are included in file with max(n_i,n_j) then exclude the file with the lowest number of snps
-UMBRAL1=0.75
-UMBRAL2=0.95
+UMBRAL1=0.75 # la ratio de número de candidatos entre dos métodos >= UMBRAL1%
+UMBRAL2=0.95 # UMBRAL2% candidatos iguales según el criterio de igualdad
+eq_crit=1000 # <= eq_crit/1000 kb de distancia entre 2 snps de dos conjuntos se considera criterio de igualdad si el % es superior a UMBRAL2, en este caso eliminamos uno de los conjuntos (ficheros)
 
 numrs=0
 factor_seguridad=0.8
@@ -522,10 +523,19 @@ def FilterCsv(ruta, Kmax=np.inf, D=-np.inf):
 
             #identify wheter the csv file is comma or semicolon separated
             
-            delimiter = csv.Sniffer().sniff(csvfile.readline()).delimiter
-            # Tras leer el delimitador vuelve a poner el cursor a 0
+##            delimiter = csv.Sniffer().sniff(csvfile.readline()).delimiter
+##            # Tras leer el delimitador vuelve a poner el cursor a 0
+##            csvfile.seek(0)
+            # 8 June 2026
+            sample = csvfile.read(4096)
             csvfile.seek(0)
-
+            try:
+                delimiter = csv.Sniffer().sniff(
+                    sample,
+                    delimiters=",;\t"
+                ).delimiter
+            except csv.Error:
+                delimiter = ","
             # Crear un objeto lector CSV
             #csv_reader = csv.DictReader(csvfile, delimiter=delimiter)
             csv_reader = csv.reader(csvfile, delimiter=delimiter)
@@ -663,7 +673,9 @@ def filter_norm(ruta,cromid=1, poscol=1, critcol=-1, criter=1, Kmax=np.inf, D=-n
         id	pos	gpos	p1	ihh1	p2	ihh2	xpehh	normxpehh	crit
         Se asume un único cromosoma y por defecto se filtran las posiciones que tengan valor >=criter en la última columna (critcol=-1)
         Returns:
-        Una lista de 1 array que corresponde al único cromosoma y los elementos del array son  las posiciones que tenían valor crit>=criter
+        Una tupa con
+        una lista de 1 array que corresponde al único cromosoma y los elementos del array son  las posiciones que tenían valor crit>=criter
+        y el número total de SNPs antes del posible filtrado
     """
     path=Path(ruta)
     try:
@@ -1398,16 +1410,61 @@ def filtrar_datos(datos_filtrados, umbral=0.75):
 
     return nueva_lista, eliminados
 
+#10 June 2026
+def count_included_with_tolerance(small, large, close=0):
+    """
+    Count how many positions in small are included in large allowing
+    a maximum absolute distance <= close.
+    Assumes arrays are sorted or sortable.
+    """
+    small = np.asarray(small)
+    large = np.asarray(large)
+
+    if small.size == 0 or large.size == 0:
+        return 0
+
+    if close <= 0:
+        return int(np.isin(small, large).sum())
+
+    large_sorted = np.sort(large)
+
+    # For each small SNP, find insertion point in large
+    idx = np.searchsorted(large_sorted, small)
+
+    included = np.zeros(small.size, dtype=bool)
+
+    # Check nearest large SNP on the right
+    right_ok = idx < large_sorted.size
+    included[right_ok] |= np.abs(
+        large_sorted[idx[right_ok]] - small[right_ok]
+    ) <= close
+
+    # Check nearest large SNP on the left
+    left_ok = idx > 0
+    included[left_ok] |= np.abs(
+        large_sorted[idx[left_ok] - 1] - small[left_ok]
+    ) <= close
+
+    return int(included.sum())
+
+
 
 '''
 v0.2 Nov 2025
-Aplicamos las reglas por cromosoma lo que es un poco  más exigente y preciso.
-En el caso global sería posible que en un cromosoma coincidan 99% pero en otro solo el 50% y según sea el umbral por ejemplo 75% podrían considerarse que cumple
-cuando algún cromosoma no cumple ni de lejos. 
+Aplicamos las reglas de redundancia por cromosoma lo que es un poco  más exigente y preciso.
+En el caso global sería posible que en un cromosoma coincidan 99% pero en otro solo el 50%
+y según sea el umbral por ejemplo 75% podrían considerarse que cumple
+cuando algún cromosoma no cumple ni de lejos.
+
+Si cromosomas_ok_B(datos_filtrados[i], datos_filtrados[j], ...) es True:
+          => consideramos que uno de los ficheros es redundante.
+
+#10 June 2026
+Actualizamos la firma y la función para permitir inclusión por cercanía
 
 '''
 
-def cromosomas_ok_B(file_i, file_j, umbral1=0.75, umbral2=1.0, min_snps=5):
+def cromosomas_ok_B(file_i, file_j, umbral1=0.75, umbral2=1.0, min_snps=5, close=0):
     """
     Regla combinada B (ratio + inclusión) por cromosoma, simétrica:
 
@@ -1429,9 +1486,10 @@ def cromosomas_ok_B(file_i, file_j, umbral1=0.75, umbral2=1.0, min_snps=5):
               frac = (# SNPs de small que están en large) / small.size
               frac >= umbral2
 
-    Devuelve True si:
-      - existe al menos un cromosoma usable, y
-      - en todos los cromosomas usables se cumplen ambas reglas.
+    Devuelve True si el par de ficheros puede considerarse redundante, es decir:
+            Devuelve True si todos los cromosomas evaluables (con al menos min_snps) cumplen los criterios de redundancia.
+            Devuelve False si no existe ningún cromosoma evaluable o si algún cromosoma evaluable no cumple dichos criterios.
+      
     """
     crom_usables = 0
 
@@ -1465,7 +1523,9 @@ def cromosomas_ok_B(file_i, file_j, umbral1=0.75, umbral2=1.0, min_snps=5):
             return False
 
         # Regla 2 local: inclusión de small en large
-        incluidos = np.isin(small, large).sum()
+        #incluidos = np.isin(small, large).sum()
+        #10 June 2026
+        incluidos = count_included_with_tolerance(small, large, close=close)
         frac = incluidos / n_small
         if frac < umbral2:
             return False
@@ -1476,7 +1536,7 @@ def cromosomas_ok_B(file_i, file_j, umbral1=0.75, umbral2=1.0, min_snps=5):
 
     return True
 
-def filtrar_datos_B(datos_filtrados, umbral1=0.75, umbral2=1.0, min_snps=5):
+def filtrar_datos_B(datos_filtrados, umbral1=0.75, umbral2=1.0, min_snps=5, close=0):
     """
     Filtrado usando la regla combinada B por cromosoma.
 
@@ -1512,7 +1572,7 @@ def filtrar_datos_B(datos_filtrados, umbral1=0.75, umbral2=1.0, min_snps=5):
             # Regla combinada B por cromosoma
             if not cromosomas_ok_B(datos_filtrados[i], datos_filtrados[j],
                                    umbral1=umbral1, umbral2=umbral2,
-                                   min_snps=min_snps):
+                                   min_snps=min_snps,close=close):
                 continue
 
             ni = n_tot[i]
@@ -3817,6 +3877,55 @@ def normalize_chromosome_lists(datos_filtrados, nombre=None):
     return datos_filtrados
 
 
+##def can_parallel_temp(maxsites, num_processes, block_size,
+##                      dtype=np.float64, factor_seguridad=0.8,
+##                      overhead=1.5):
+##    avail = obtener_memoria_disponible_giB()
+##    mem_vec = calcular_memoria((maxsites,), dtype=dtype)
+##
+##    required = (
+##        mem_vec
+##        * (1 + 2 * min(block_size, num_processes) + block_size)
+##        * overhead
+##    )
+##
+##    return required < avail * factor_seguridad, required, avail, mem_vec
+
+
+def can_parallel_temp(maxsites, num_processes, block_size,
+                      dtype=np.float64, factor_seguridad=0.8,
+                      overhead=1.5):
+    avail = obtener_memoria_disponible_giB()
+    mem_vec = calcular_memoria((maxsites,), dtype=dtype)
+    block_size = max(2, int(block_size))
+    # Probar primero el block_size solicitado y luego reducir
+    candidate_blocks = [block_size, 50, 25, 10, 5, 2]
+    candidate_blocks = [b for b in candidate_blocks if 2 <= b <= block_size]
+    candidate_blocks = sorted(set(candidate_blocks), reverse=True)
+
+    for bs in candidate_blocks:
+        active = min(bs, num_processes)
+
+        required = (
+            mem_vec
+            * (1 + 2 * active + bs)
+            * overhead
+        )
+
+        if required < avail * factor_seguridad:
+            return True, required, avail, mem_vec, bs
+
+    # Si ninguno cabe, devolver la estimación para block_size=1
+    bs = 2
+    active = min(bs, num_processes)
+    required = (
+        mem_vec
+        * (1 + 2 * active + bs)
+        * overhead
+    )
+
+    return False, required, avail, mem_vec, bs
+
 
 '''
 End of v0.3 
@@ -3849,8 +3958,13 @@ def main():
     # Argumento con nombre para el nivel de significación
     parser.add_argument('--SL', type=float, default=0.05,
                         help='significance level, a value between 0 and 1')
-    parser.add_argument('--Kmax', type=int, default=np.inf,
-                        help='Kmax significant sites per chromosome, an integer between 0 and 1E6')
+    parser.add_argument(
+        '--Kmax', '--kmax', '--KMAX',
+        dest='Kmax',
+        type=int,
+        default=np.inf,
+        help='Kmax significant sites per chromosome, an integer between 0 and 1E6'
+    )
     # Argumento con nombre para la distancia en las interseccions y para el filtrado de clusters dentro de cromosomas si el número de sitios es grande (>=Kmax)
     parser.add_argument('--dist', type=int, default=-1,
                         help='distances, an integer between 0 and 1E8')
@@ -3952,9 +4066,9 @@ def main():
     )
 
     # Argumento con nombre para evitar calcular las intersecciones
-    parser.add_argument('--skip-intersection', action='store_true',
+    parser.add_argument('--intersection', action='store_true',
                         help=(
-            "Skip SNP intersection computation."
+            "do SNP intersection computation."
                         )
     )
 
@@ -3991,8 +4105,6 @@ def main():
 
 
     # 02 May 2026 Controlar inconsistencia entre chrom-id y paint chrom
-    args = parser.parse_args()
-
     paint_chr = None
     if args.paint not in (False, None, 'all'):
         paint_chr = int(args.paint)
@@ -4011,7 +4123,7 @@ def main():
 
 
     #v0.3
-    intersec = not args.skip_intersection
+    intersec = args.intersection
     R_MAX = 1000
     S_MAX = 10_000
 
@@ -4047,7 +4159,10 @@ def main():
     distance=10000 #default value
     if args.dist>=0:
         distance=args.dist
-       
+
+    #Para posterior construcción del nombre de los ficheros de resultados
+    formatted_distance = f"{distance:.1E}".replace('+', '').replace('E0', 'E') # to print x with 3 decimals: f'x:.3E'
+    
     # Validar el valor de perm
     if not 0 <= args.perm <= int(1E6):
         raise ValueError("The number of permutations must be an integer between 0 and 1E6.")
@@ -4091,7 +4206,22 @@ def main():
         dirdatos='.' # datos en el mismo sitio que el ejecutable
     else:
         dirdatos= args.path
+        
+    dirsalida="KLinterSel_Results"
+    dirsalida = os.path.join(dirdatos,dirsalida)
+    mkdir(dirsalida)
 
+    log_path = os.path.join(dirsalida, "KLinterSel.log")
+    result_handler = logging.FileHandler(log_path, mode='a', delay=True)
+    result_handler.setFormatter(formatter)
+
+    if not any(
+        isinstance(h, logging.FileHandler)
+        and getattr(h, "baseFilename", "") == os.path.abspath(log_path)
+        for h in logger.handlers
+    ):
+        logger.addHandler(result_handler)
+    
     nombre=[]
     datos_filtrados=[]
     maxsnps_perfile=['']
@@ -4188,7 +4318,7 @@ def main():
 
             #datos_filtrados, eliminados,  = filtrar_datos(datos_filtrados, umbral=0.75)
 
-            datos_filtrados, eliminados,  = filtrar_datos_B(datos_filtrados, umbral1=UMBRAL1, umbral2=UMBRAL2, min_snps=5)
+            datos_filtrados, eliminados,  = filtrar_datos_B(datos_filtrados, umbral1=UMBRAL1, umbral2=UMBRAL2, min_snps=5, close =eq_crit)
 
             numfiles= len(datos_filtrados) # actualiza el número total de ficheros
 
@@ -4196,12 +4326,23 @@ def main():
 
             if eliminados: #actualiza la lista de nombres
 
+                if eq_crit > 0:
+                    inclusion_msg = f"using a proximity criterion of <= {eq_crit/1000:.3g} kb"
+                else:
+                    inclusion_msg = "using exact SNP-position matching"
 
                 for superset_idx, subset_list in eliminados.items():
                     nombre_superset = nombre[superset_idx]
                     for subset_idx in subset_list:
                         nombre_subset = nombre[subset_idx]
-                        msg=f"File {nombre_subset} eliminated because at least {UMBRAL2:.0%} of its candidates are included in file {nombre_superset}.\n************************\n"
+
+                        msg = (
+                            f"\n************************\nFile {nombre_subset} eliminated because at least {UMBRAL2:.0%} "
+                            f"of its candidates are included in file {nombre_superset} "
+                            f"{inclusion_msg}.\n"
+                            "\n************************\n"
+                        )
+
                         print('\n'+msg)
                         logging.warning(msg)
                 #Actualiza la lista de nombres y de max snps per file
@@ -4222,7 +4363,38 @@ def main():
     Lsitios=[]
     for data in datos_filtrados: # Cada elemento de datos filtrados corresponde a los datos de un fichero
         Lsitios.append([fila.size for fila in data]) #Lsitos tiene tantas filas como ficheros y tantas columnas como cromosomas. Los valores de celdas (dim 3) son el número de snps en ese cromosoma (columna dim 2) y fichero (fila dim 1)
+    #9 June 2026
+    excluded_empty_methods = []
+    empty_methods = [
+        i for i in range(1, numfiles)
+        if np.sum(Lsitios[i]) == 0
+    ]
+    excluded_empty_methods = [(i, nombre[i]) for i in empty_methods]
+    # 10 June 2026 eliminamos ficheros vacíos solo para Tkl para HGkI dejamos Lsitios a 0
+    drop_empty_methods = bool(empty_methods) and not (TEST and args.HG)
 
+    if drop_empty_methods:
+        for i in empty_methods:
+            msg = f"Candidate file {nombre[i]} is empty and will be excluded from TKL distance calculations."
+            print("WARNING:", msg)
+            logging.warning(msg)
+
+        keep = [0] + [i for i in range(1, numfiles) if i not in empty_methods]
+        datos_filtrados = [datos_filtrados[i] for i in keep]
+        nombre = [nombre[i] for i in keep]
+        maxsnps_perfile = [maxsnps_perfile[i] for i in keep]
+        
+        numfiles = len(nombre)
+        Lsitios = [[fila.size for fila in data] for data in datos_filtrados]
+
+        if numfiles < 3:
+            print("Only one non-empty candidate file remains. Nothing to test.")
+            sys.exit(0)
+    elif empty_methods and TEST and args.HG:
+        for i in empty_methods:
+            msg = f"Candidate file {nombre[i]} is empty and will be retained in HGkI with zero candidate SNPs."
+            print("WARNING:", msg)
+            logging.warning(msg)
     numcroms=len(Lsitios[0])
     #v0.3 the test for all or for a specific chromosome
     chrom_index = None if args.chr_id is None else (args.chr_id - 1)
@@ -4309,7 +4481,7 @@ def main():
 
     if TEST:
         #v0.3
-        arrP=np.zeros(numcroms)
+        arrP=np.ones(numcroms)
 
         if args.HG: # HGkI test
 
@@ -4324,6 +4496,11 @@ def main():
             test=  'HGkItest'
             formatted_window = f"{W:.1E}".replace('+', '').replace('E0', 'E') # to print x with 3 decimals: f'x:.3E'
             out_name2 = test+ '_W'+formatted_window
+
+            strkmax=str(args.Kmax)
+            if strkmax!='inf':
+                out_name2+='_Kmax_' +str(args.Kmax)+'_D'+formatted_distance
+                
             if not args.strict:
                 out_name2+='_Perm'
             out_name2+='_'+moment2
@@ -4630,7 +4807,7 @@ def main():
             strkmax=str(args.Kmax)
 
             if strkmax!='inf':
-                out_name1+='_Kmax_' +str(args.Kmax)
+                out_name1+='_Kmax_' +str(args.Kmax)+'_D'+formatted_distance
 
             if not args.strict:
                 out_name1+='_Perm'
@@ -4824,7 +5001,7 @@ def main():
 
                         # CALCULA RAM DISPONIBLE
                         forma_array = (numrs, maxsites)
-                        mem, err, reqram = procesar_bloque(forma_array)
+                        mem, err, reqram = procesar_bloque(forma_array) # June 2026
                         if not mem: #Si no hay memoria suficiente para almacenar todas las réplicas pasamos al modo TEMP que no las almacena
 
                             try: #Comprobamos que sí hay memoria para el número total de distancias si no lanzamos excepción y terminamos
@@ -4844,7 +5021,7 @@ def main():
                                 #mensaje_error_2 = f"Error: {e}\nPlease refer to the 'memory.log' file for more details."
                                 #logging.error(mensaje_error_completo)  # Mensaje personalizado de error en el log
                                 #print(mensaje_error_completo)
-                                logging.error(mensaje)
+                                logging.error(str(e))
                                 print(f"\nError: {e}")
                                 print(f"Please refer to the {Path(handler.baseFilename).name} file for more details.")
                                 sys.exit(1)
@@ -4861,13 +5038,40 @@ def main():
                             avertot_distances = np.mean(np.vstack(rtot_distances), axis=0)
                             
                         else: #NO SE ALMACENAN RÉPLICAS
+                            #06-09 June 2026
 
-                            if PARALLEL and not args.uniform:
-                                print(f'Moving to memory management functions to handle {round(reqram)} GiB')
+##                            use_parallel_temp, req_parallel, avail, mem_vec = can_parallel_temp(
+##                                maxsites=maxsites,
+##                                num_processes=num_processes,
+##                                block_size=BLOCK_SIZE)
+                            use_parallel_temp, req_parallel, avail, mem_vec, safe_block_size = can_parallel_temp(
+                                maxsites=maxsites,
+                                num_processes=num_processes,
+                                block_size=BLOCK_SIZE)
+                            if PARALLEL and not args.uniform and use_parallel_temp:
+                                print(
+                                    f"Moving to parallel TEMP mode with block_size={safe_block_size} "
+                                    f"to handle {round(reqram)} GiB"
+                                )
                                 print(f'CALCULATING EXPECTED DISTRIBUTION')
-                                avertot_distances = calcular_avertot_distances(numrs, numfiles, datos_filtrados, Lsitios, c, maxsites,maxproc=num_processes)
+##                                avertot_distances = calcular_avertot_distances(
+##                                    numrs, numfiles, datos_filtrados, Lsitios, c, maxsites,
+##                                    maxproc=num_processes,block_size=BLOCK_SIZE)
+                                #09 June 2026
+                                avertot_distances = calcular_avertot_distances(
+                                    numrs, numfiles, datos_filtrados, Lsitios, c, maxsites,
+                                    maxproc=num_processes, block_size=safe_block_size)
+                            
                             else:
-
+                                if PARALLEL and not args.uniform:
+                                    msg = (
+                                        f"Parallel TEMP disabled automatically: "
+                                        f"one distance vector uses {mem_vec:.2f} GiB; "
+                                        f"estimated parallel requirement {req_parallel:.2f} GiB; "
+                                        f"available {avail:.2f} GiB."
+                                    )
+                                    print(msg)
+                                    logging.warning(msg)
                                 for r in range(numrs):
                                     if args.uniform: #v0.2 Nov 2025
                                         rmuestra = [
@@ -4916,7 +5120,7 @@ def main():
                                     arrP[c] = calculate_vectorized(rtot_distances, avertot_distances, arrKL, emedian, c)
                                 else:
 
-                                    arrP[c] = 0.0 # Antes de acumular, no necesario porque se inicializa a zeros pero por seguridad reduntante
+                                    arrP[c] = 0.0 # Antes de acumular, necesario porque en la definición se inicializa a one
                                     
 
                                     for _ in range(numrs):
@@ -4958,6 +5162,7 @@ def main():
                                         print(f'CALCULATING p-VALUES')
                                         arrP[c] = calcular_arrP_paralelo_bloques(numrs, numfiles, datos_filtrados, Lsitios, c, maxsites, avertot_distances, arrKL, emedian,maxproc=num_processes,block_size=BLOCK_SIZE)
                                     else:
+                                        arrP[c] = 0.0 # Antes de acumular, necesario porque en la definición se inicializa a one
                                     
                                         for r in range(numrs):
 
@@ -5161,13 +5366,6 @@ def main():
     ### ########################        OUTPUT                  #########################
     #####################################################################################
     
-    dirsalida="KLinterSel_Results"
-    dirsalida = os.path.join(dirdatos,dirsalida)
-    mkdir(dirsalida)
-
-    #Para posterior construcción del nombre de los ficheros de resultados
-    formatted_distance = f"{distance:.1E}".replace('+', '').replace('E0', 'E') # to print x with 3 decimals: f'x:.3E'
-    
     #Moment
     moment = datetime.now()
     moment = moment.strftime("%d%m%y_%H%M%S")
@@ -5177,7 +5375,7 @@ def main():
         out_name3 = test
         strkmax=str(args.Kmax)
         if strkmax!='inf':
-            out_name3+='_Kmax_' +str(args.Kmax)
+            out_name3+='_Kmax_' +str(args.Kmax)+'_D'+formatted_distance
 
         if not args.strict:
             out_name3+='_Perm'
@@ -5279,8 +5477,21 @@ def main():
                         f.write(f'{nombre[i]} ({keyname}{i}){delimiter}{nsites}{delimiter}SNPs\n')
                     else:
                         f.write(f'{nombre[i]} ({keyname}{i}){delimiter}{nsites}{delimiter}SNPs{delimiter}after grouping from {maxsnps_perfile[i]}\n')
-                    
+
+                for old_i, old_name in excluded_empty_methods:
+                    f.write(
+                        f'{old_name}{delimiter}0{delimiter}'
+                        f'SNPs{delimiter}excluded_empty_candidate_file\n'
+                    )
+            
                 f.write(f'Number of permutations{delimiter}{numrs}\n')
+                if excluded_empty_methods:
+                    f.write(
+                        f'WARNING{delimiter}'
+                        f'{len(excluded_empty_methods)} empty candidate file(s) were excluded from TKL distance calculations. '
+                        f'Results refer only to the non-empty candidate files; absence of candidates in excluded files indicates no support from those method(s).\n'
+                    )
+                    
                 f.write(f'CHR{delimiter}TOTALS{delimiter}')
                 for i in range(1,numfiles):
                     f.write(f'SEL-{i}{delimiter}')

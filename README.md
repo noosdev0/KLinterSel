@@ -1,6 +1,8 @@
-# Update v0.3 (May 2026)  
+# Update v0.3 (June 2026)  
 The January v0.3 release introduces a **new statistical test for k-way SNP coincidence based on a sequentially conditioned hypergeometric model (HGkI)**, extending KLinterSel beyond distance-based analyses.
 The May 2026 update introduces minor revisions to the manual and source files, and fixes a minor bug related to the handling of analyses in which one of the candidate files contains significant sites for only a single chromosome. No methodological changes relative to the original v0.3 release were introduced.
+The June 2026 update improves memory-block handling for large parallelized analyses, reducing the risk of exhausting the available RAM. In addition, intersections are no longer computed by default and must now be explicitly enabled using `--intersection`; the previous `--skip-intersection` argument has been removed.
+
 
 ### New in v0.3
 
