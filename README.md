@@ -1,3 +1,21 @@
+<img src="images/thinkazul.svg" alt="Think in azul" width="100" align="right">
+
+# KLinterSel
+
+# Update v0.3.1 (October 2026)
+
+Version 0.3.1 introduces several improvements in computational efficiency, input compatibility, and data validation:
+
+- **HGkI is now the default statistical test**, while the Monte Carlo TKL test can be selected using `--TKL`.
+- Improved computational efficiency and memory management for large genomic datasets.
+- Optimized calculation of candidate intersections across multiple methods.
+- Added support for **selscan 2.1 and 3.x `.norm` files**, with or without column headers.
+- Added direct support for **iHDSel significant-candidate files (`*_SIG.tsv`)**.
+- Improved input validation, consistency checks, and handling of empty candidate sets.
+- Enhanced `--stats` reporting, including candidate counts and the effects of cluster filtering.
+
+For complete details, see the KLinterSel v0.3.1 manual.
+
 # Update v0.3 (June 2026)  
 The January v0.3 release introduces a **new statistical test for k-way SNP coincidence based on a sequentially conditioned hypergeometric model (HGkI)**, extending KLinterSel beyond distance-based analyses.
 The May 2026 update introduces minor revisions to the manual and source files, and fixes a minor bug related to the handling of analyses in which one of the candidate files contains significant sites for only a single chromosome. No methodological changes relative to the original v0.3 release were introduced.
@@ -38,8 +56,6 @@ This version introduced several improvements and bug fixes:
 These changes improve reproducibility, performance, and interpretability while maintaining full compatibility with previous workflows.
 
 ---
-
-# KLinterSel <img align="right" src="images/thinkazul.svg" alt="Think in azul" width="100">
 
 KLinterSel is a Python project for calculating intersections between selective sites detected by different methods. The main script performs operations on genomic data from selective scans and supports statistical tests and plotting.
 
@@ -125,27 +141,40 @@ From the project folder:
 
 ## Usage
 
-Run the main script that executes the TKL test:
-```bash  
-    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...]
-```
-To perform the HGkI test for SNP coincidence
-```bash  
-    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --HG
-```
-The same HGkI test for overlapping windows of 1 kb
-```bash  
-    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --HG --w 1000
-```
-Only intersections at a specified distance:
-```bash  
-    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --dist <distance> --notest
+Run the main script to perform the default HGkI test:
+
+```bash
+python3 KLinterSel.py <file1> <file2> <file3> [file4 ...]
 ```
 
-Plot distributions:
-```bash  
-    python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --paint
+To perform the Monte Carlo TKL test:
+
+```bash
+python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --TKL
 ```
+
+To perform the HGkI test using overlapping windows of 1 kb:
+
+```bash
+python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --W 1000
+```
+
+To calculate candidate intersections within a specified distance, without performing a statistical test:
+
+```bash
+python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --intersection --dist <distance> --notest
+```
+
+To plot the observed and expected distance distributions using TKL:
+
+```bash
+python3 KLinterSel.py <file1> <file2> <file3> [file4 ...] --TKL --paint
+```
+**Important note on single-chromosome input files:**
+
+When using selscan `.norm` or iHDSel `*_SIG.tsv` files, all input files must correspond to a single chromosome. KLinterSel internally assigns these files to chromosome 1. Therefore, any other input files containing chromosome identifiers (e.g., `.map`, `.csv`, or `.txt`) must also use chromosome identifier `1`, regardless of the actual biological chromosome. Physical SNP positions must remain unchanged.
+
+For further details, see the KLinterSel manual.
   
 ## Features
 
