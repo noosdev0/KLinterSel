@@ -2,6 +2,10 @@
 
 # KLinterSel
 
+**Documentation update (November 16, 2026)**
+
+The KLinterSel v0.3.1 manual has been updated with additional clarifications and usage recommendations. No changes have been made to the program code or analytical results.
+
 # Update v0.3.1 (October 2026)
 
 Version 0.3.1 introduces several improvements in computational efficiency, input compatibility, and data validation:
